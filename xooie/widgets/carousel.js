@@ -471,7 +471,7 @@ define('xooie/widgets/carousel', ['jquery', 'xooie/helpers', 'xooie/widgets/base
  *
  * This role maps to the ARIA [tab list](http://www.w3.org/TR/wai-aria/roles#list)
  **/
-  Carousel.defineRole('content');
+  Carousel.defineRole('content', true);
 
 /**
  * Xooie.Carousel#item() -> Elements
@@ -542,7 +542,7 @@ define('xooie/widgets/carousel', ['jquery', 'xooie/helpers', 'xooie/widgets/base
           position, itemWidth,
           i;
 
-      content = this.contents();
+      content = this.content();
       items = this.items();
 
       if (biasRight) {
@@ -678,9 +678,9 @@ define('xooie/widgets/carousel', ['jquery', 'xooie/helpers', 'xooie/widgets/base
 
 /** internal
  * Xooie.Carousel#_process_role_content(content) -> Element
- * - content (Element): A jQuery-selected collection of [[Xooie.Carousel#contents]]
+ * - content (Element): A jQuery-selected collection of [[Xooie.Carousel#content]]
  *
- * This method processes the element that has been designated as a [[Xooie.Carousel#contents]].
+ * This method processes the element that has been designated as a [[Xooie.Carousel#content]].
  * In addition to applying the [[Xooie.Carousel#contentClass]] the content is also given the
  * aria role [list](http://www.w3.org/TR/wai-aria/roles#list) if it is neither a `ul` or `ol` element.
  **/
@@ -697,16 +697,16 @@ define('xooie/widgets/carousel', ['jquery', 'xooie/helpers', 'xooie/widgets/base
 /** internal
  * Xooie.Carousel#_render_role_wrapper() -> Element
  *
- * Renders a `div` tag that is wrapped around the [[Xooie.Carousel#contents]].  This element is
+ * Renders a `div` tag that is wrapped around the [[Xooie.Carousel#content]].  This element is
  * rendered only if no other [[Xooie.Carousel#wrappers]] is present as a decendant of the root of this
  * widget.
  **/
   Carousel.prototype._render_role_wrapper = function() {
     var wrapper = $('<div data-x-role="wrapper" />');
 
-    this.contents().wrap(wrapper);
+    this.content().wrap(wrapper);
 
-    return this.contents().parent();
+    return this.content().parent();
   };
 
 /** internal
@@ -728,10 +728,10 @@ define('xooie/widgets/carousel', ['jquery', 'xooie/helpers', 'xooie/widgets/base
 /** internal
  * Xooie.Carousel#_get_role_item() -> Element
  *
- * Gets all children of [[Xooie.Carousel#contents]].
+ * Gets all children of [[Xooie.Carousel#content]].
  **/
   Carousel.prototype._get_role_item = function() {
-    return this.contents().children();
+    return this.content().children();
   };
 
 /** internal
