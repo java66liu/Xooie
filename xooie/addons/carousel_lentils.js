@@ -1,5 +1,5 @@
 /*
-*   Copyright 2012 Comcast
+*   Copyright 2013 Comcast
 *
 *   Licensed under the Apache License, Version 2.0 (the "License");
 *   you may not use this file except in compliance with the License.
@@ -14,24 +14,23 @@
 *   limitations under the License.
 */
 
-define('xooie/addons/carousel_lentils', ['jquery', 'xooie/addons/base', 'xooie/helpers'], function($, Base, helpers) {
-
-  var Lentils = Base.extend(function() {
+define('xooie/addons/carousel_lentils', ['jquery', 'xooie/addons/base', 'xooie/helpers'], function ($, Base, helpers) {
+  'use strict';
+  var Lentils = Base.extend(function () {
     var self = this;
 
     this._builders = {
       item: function (container, template) {
-        var items = self.widget().items(),
-            element, i;
+        var items = self.widget().items(), element, i;
 
         for (i = 0; i < items.length; i += 1) {
 
-            element = self.widget().render(template, {
-                number: i + 1,
-                scroll_mode: "item",
-                lentil_is_last: (i === items.length - 1)
-            });
-            container.append(element);
+          element = self.widget().render(template, {
+            number: i + 1,
+            scroll_mode: "item",
+            lentil_is_last: (i === items.length - 1)
+          });
+          container.append(element);
         }
       },
 
@@ -56,11 +55,11 @@ define('xooie/addons/carousel_lentils', ['jquery', 'xooie/addons/base', 'xooie/h
 
     this.root().addClass('is-carousel-lentiled');
 
-    this.root().on('carouselUpdated', function() {
+    this.root().on('carouselUpdated', function () {
       self.updateLentils();
     });
 
-    this.root().on('carouselScrollComplete', function() {
+    this.root().on('carouselScrollComplete', function () {
       self.currentLentil();
     });
 
@@ -68,10 +67,10 @@ define('xooie/addons/carousel_lentils', ['jquery', 'xooie/addons/base', 'xooie/h
       this.get('initEvent'),
       this.get('refreshEvent'),
       this.get('resizeEvent')].join(' '),
-    function(){
-      self.updateLentils();
-      self.currentLentil();
-    });
+      function () {
+        self.updateLentils();
+        self.currentLentil();
+      });
   });
 
   Lentils.define('lentilMode', 'item');
@@ -81,14 +80,10 @@ define('xooie/addons/carousel_lentils', ['jquery', 'xooie/addons/base', 'xooie/h
   Lentils.defineReadOnly('lentilTemplateSelector', '[data-role="carousel-lentils-template"]');
 
   //Lentils.defineReadOnly('')
+  /*
+  Lentils.prototype.update = function () {
 
-  //<script data-role="carousel-lentils-template" lang>
-  //  '<li><button></button></li>'
-  //</script>
-
-  Lentils.prototype.update = function() {
-
-  };
+  };*/
 
   /*Lentils.setDefaultOptions({
       lentilMode: 'item',
@@ -98,42 +93,37 @@ define('xooie/addons/carousel_lentils', ['jquery', 'xooie/addons/base', 'xooie/h
       activeLentilClass: 'is-active-lentil'
   });*/
 
-  Lentils.prototype.currentLentil = function(){
-      var container = this.module.root.find(this.options.lentilSelector),
-          lentils = container.children(),
-          index;
+  Lentils.prototype.currentLentil = function () {
+    var container = this.module.root.find(this.options.lentilSelector), lentils = container.children(), index;
 
-      if (this.options.lentilMode === 'page' && typeof this.module.addons.pagination !== 'undefined') {
-          index = this.module.addons.pagination.currentPage();
-      } else {
-          index = this.module.currentItem();
-      }
+    if (this.options.lentilMode === 'page' &&  helpers.isDefined(this.module.addons.pagination)) {
+      index = this.module.addons.pagination.currentPage();
+    } else {
+      index = this.module.currentItem();
+    }
 
-      lentils.filter('.' + this.options.activeLentilClass).removeClass(this.options.activeLentilClass);
+    lentils.filter('.' + this.options.activeLentilClass).removeClass(this.options.activeLentilClass);
 
-      lentils.eq(index).addClass(this.options.activeLentilClass);
+    lentils.eq(index).addClass(this.options.activeLentilClass);
   };
 
-  Lentils.prototype.updateLentils = function() {
-      var container = this.module.root.find(this.options.lentilSelector),
-          template = this.module.root.find(this.options.lentilTemplateSelector),
-          self = this;
+  Lentils.prototype.updateLentils = function () {
+    var container = this.module.root.find(this.options.lentilSelector), template = this.module.root.find(this.options.lentilTemplateSelector), self = this;
 
-      if (container.length > 0 && template.length > 0) {
-          container.html('');
+    if (container.length > 0 && template.length > 0) {
+      container.html('');
 
-          if (typeof this.lentilBuilders[this.options.lentilMode] === 'function') {
-              this.lentilBuilders[this.options.lentilMode](container, template);
+      if (helpers.isFunction(this.lentilBuilders[this.options.lentilMode])) {
+        this.lentilBuilders[this.options.lentilMode](container, template);
 
-              container.children().on('click', function(event) {
-                  event.preventDefault();
-                  self.module.updatePosition($(this).data('scroll'));
-              });
+        container.children().on('click', function (event) {
+          event.preventDefault();
+          self.module.updatePosition($(this).data('scroll'));
+        });
 
-              this.currentLentil();
-
-          }
+        this.currentLentil();
       }
+    }
   };
 
   return Lentils;

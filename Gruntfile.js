@@ -18,42 +18,93 @@ module.exports = function(grunt) {
             "xooie/widgets/dropdown",
             "xooie/widgets/accordion",
             "xooie/widgets/tab",
-            "xooie/widgets/dialog",
-            "xooie/addons/carousel_lentils",
-            "xooie/addons/carousel_pagination",
-            "xooie/addons/tab_animation"
+            "xooie/widgets/dialog"
           ],
           out: "source/javascripts/xooie-<%= pkg.version %>.js",
           optimize: "none"
+        }
+      },
+      compile_min: {
+        options: {
+          baseUrl: "",
+          paths: {
+            jquery: "empty:",
+            async: "empty:"
+          },
+          name: "xooie/xooie",
+          include: [
+            "xooie/widgets/carousel",
+            "xooie/widgets/dropdown",
+            "xooie/widgets/accordion",
+            "xooie/widgets/tab",
+            "xooie/widgets/dialog"
+          ],
+          out: "source/javascripts/xooie-<%= pkg.version %>-min.js",
+          optimize: "uglify"
         }
       }
     },
     jasmine: {
       test: {
         //src: "xooie/**/*.js",
-        src: ['xooie/widgets/base.js', 'xooie/widgets/dropdown.js', 'xooie/widgets/carousel.js', 'xooie/addons/base.js', 'xooie/**.js'],
+        src: ['xooie/widgets/base.js', 'xooie/widgets/dropdown.js', 'xooie/widgets/carousel.js', 'xooie/widgets/tab.js', 'xooie/widgets/accordion.js', 'xooie/addons/base.js', 'xooie/**.js'],
         options: {
           //specs: "spec/**/*.spec.js",
-          specs: ['spec/widgets/base.spec.js', 'spec/widgets/dropdown.spec.js', 'spec/widgets/carousel.spec.js', 'spec/addons/base.spec.js', 'spec/**.js'],
-          template: require("grunt-template-jasmine-requirejs"),
+          specs: ['spec/widgets/base.spec.js', 'spec/widgets/dropdown.spec.js', 'spec/widgets/carousel.spec.js', 'spec/widgets/tab.spec.js', 'spec/widgets/accordion.spec.js', 'spec/addons/base.spec.js', 'spec/**.js'],
+          template: require('grunt-template-jasmine-istanbul'),
           vendor: ["lib/jquery.js","lib/require.js","lib/micro_tmpl.js","lib/jasmine-jquery.js"],
           helpers: "spec/helpers.js",
           templateOptions: {
-            requireConfigFile: 'lib/config.js'
+            coverage: 'source/coverage/coverage.json',
+            report: 'source/coverage',
+            template: require('grunt-template-jasmine-requirejs'),
+            templateOptions: {
+              requireConfigFile: 'lib/config.js'
+            }
           }
         }
       }
     },
-    jshint: {
-      files: 'xooie/**/*.js'
+    jslint: {
+      xooie: {
+        src: ['xooie/**/*.js', 'spec/event_handler.spec.js', 'spec/helpers.spec.js', 'spec/shared.spec.js', 'spec/stylesheet.spec.js', 'spec/widgets/carousel.spec.js'],
+        directives: {
+          todo: true,
+          nomen: true,
+          nonew: true,
+          indent: 2,
+          predef: [
+            'define',
+            'require',
+            'window',
+            'document',
+            'setTimeout',
+            'clearTimeout',
+            'setInterval',
+            'clearInterval',
+            'Mustache',
+            '_',
+            'jasmine',
+            'describe',
+            'it',
+            'expect',
+            'beforeEach',
+            'afterEach',
+            'spyOn',
+            'setFixtures',
+            'waitsFor',
+            'runs'
+          ]
+        }
+      }
     }
   });
 
   grunt.loadNpmTasks('grunt-contrib-requirejs');
   grunt.loadNpmTasks('grunt-contrib-jasmine');
-  grunt.loadNpmTasks('grunt-contrib-jshint');
+  grunt.loadNpmTasks('grunt-jslint');
 
-  grunt.registerTask('test', ['jshint', 'jasmine']);
+  grunt.registerTask('test', ['jslint', 'jasmine']);
   grunt.registerTask('build', ['test', 'requirejs']);
 
 };

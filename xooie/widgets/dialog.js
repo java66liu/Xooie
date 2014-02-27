@@ -1,5 +1,5 @@
 /*
-*   Copyright 2012 Comcast
+*   Copyright 2013 Comcast
 *
 *   Licensed under the Apache License, Version 2.0 (the "License");
 *   you may not use this file except in compliance with the License.
@@ -14,11 +14,11 @@
 *   limitations under the License.
 */
 
-define('xooie/widgets/dialog', ['jquery', 'xooie/xooie', 'xooie/widgets/base', 'xooie/helpers', 'xooie/event_handler'], function($, $X, Base, helpers, EventHandler) {
+define('xooie/widgets/dialog', ['jquery', 'xooie/xooie', 'xooie/widgets/base', 'xooie/helpers', 'xooie/event_handler'], function ($, $X, Base, helpers, EventHandler) {
+  'use strict';
+  var Dialog;
 
-  var Dialog, queue;
-
-  $X.openDialog = function(element) {
+  $X.openDialog = function (element) {
     element = $(element);
     var id, instance;
 
@@ -26,12 +26,12 @@ define('xooie/widgets/dialog', ['jquery', 'xooie/xooie', 'xooie/widgets/base', '
 
     instance = $X._instanceCache[id];
 
-    if (!helpers.isUndefined(instance)) {
+    if (helpers.isDefined(instance)) {
       instance.open();
     }
   };
 
-  $X.closeDialog = function(element) {
+  $X.closeDialog = function (element) {
     element = $(element);
     var id, instance;
 
@@ -39,7 +39,7 @@ define('xooie/widgets/dialog', ['jquery', 'xooie/xooie', 'xooie/widgets/base', '
 
     instance = $X._instanceCache[id];
 
-    if (!helpers.isUndefined(instance)) {
+    if (helpers.isDefined(instance)) {
       instance.close();
     }
   };
@@ -47,15 +47,15 @@ define('xooie/widgets/dialog', ['jquery', 'xooie/xooie', 'xooie/widgets/base', '
   function parseCtrlStr(ctrlStr) {
     ctrlStr = ctrlStr.toLowerCase();
 
-    var ptrnMatch = ctrlStr.match(/^dialogcontrol:(.*)$/);
+    var ptrnMatch = ctrlStr.match(/^dialogcontrol:([\w\W]*)$/);
 
     if (ptrnMatch !== null) {
       return ptrnMatch.slice(1);
     }
   }
 
-  Dialog = Base.extend(function() {
-		var self = this;
+  Dialog = Base.extend(function () {
+    var self = this;
 
     this.root().attr('role', 'dialog')
                .attr('aria-labelledby', this.dialogtitles().attr('id'))
@@ -65,39 +65,39 @@ define('xooie/widgets/dialog', ['jquery', 'xooie/xooie', 'xooie/widgets/base', '
     this._controlEvents = new EventHandler(this.namespace());
 
     this._controlEvents.add({
-			mouseup: function(event) {
-				var ctrl, action;
+      mouseup: function () {
+        var ctrl, action;
 
-				ctrl = $(this);
-				action = parseCtrlStr(ctrl.attr('data-x-role'))[0];
+        ctrl = $(this);
+        action = parseCtrlStr(ctrl.attr('data-x-role'))[0];
 
-				if (!ctrl.is(':disabled')) {
-					self.root().trigger(action);
-				}
-			},
+        if (!ctrl.is(':disabled')) {
+          self.root().trigger(action);
+        }
+      },
 
-			keyup: function(event) {
-				var ctrl, action;
+      keyup: function (event) {
+        var ctrl, action;
 
-				if ([13,32].indexOf(event.which) !== -1) {
-					ctrl = $(this);
-					action = parseCtrlStr(ctrl.attr('data-x-role'))[0];
+        if ([13, 32].indexOf(event.which) !== -1) {
+          ctrl = $(this);
+          action = parseCtrlStr(ctrl.attr('data-x-role'))[0];
 
-					if (!ctrl.is(':disabled')) {
-						self.root().trigger(action);
-					}
-				}
-			}
+          if (!ctrl.is(':disabled')) {
+            self.root().trigger(action);
+          }
+        }
+      }
     });
 
     this._dialogEvents = new EventHandler(this.namespace());
 
     this._dialogEvents.add({
-      open: function() {
+      open: function () {
         self.open();
       },
 
-      close: function() {
+      close: function () {
         self.close();
       }
     });
@@ -128,7 +128,7 @@ define('xooie/widgets/dialog', ['jquery', 'xooie/xooie', 'xooie/widgets/base', '
     display: 'block'
   });
 
-  Dialog.prototype.open = function() {
+  Dialog.prototype.open = function () {
     this.root().addClass(this.activeClass());
 
     // TODO: set focus on the first focusable item in the dialog
@@ -136,20 +136,20 @@ define('xooie/widgets/dialog', ['jquery', 'xooie/xooie', 'xooie/widgets/base', '
     this.root().find('button').focus();
   };
 
-  Dialog.prototype.close = function() {
+  Dialog.prototype.close = function () {
     this.root().removeClass(this.activeClass());
   };
 
-  Dialog.prototype.isActive = function() {
+  Dialog.prototype.isActive = function () {
     return this.root().hasClass(this.activeClass());
   };
 
-  Dialog.prototype._get_role_dialogcontrol = function() {
+  Dialog.prototype._get_role_dialogcontrol = function () {
     return this.root().find('[data-x-role^="dialogcontrol"]');
   };
 
-  Dialog.prototype._process_role_dialogcontrol = function(dialogcontrols) {
-		dialogcontrols.on(this._controlEvents.handlers);
+  Dialog.prototype._process_role_dialogcontrol = function (dialogcontrols) {
+    dialogcontrols.on(this._controlEvents.handlers);
 
     return dialogcontrols;
   };

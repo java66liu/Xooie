@@ -15,6 +15,50 @@
 *   limitations under the License.
 */
 
+/* Polyfill methods for Xooie */
+
+// Adds Array.prototype.indexOf functionality to IE<9 (From MDN)
+if (!Array.prototype.indexOf) {
+  Array.prototype.indexOf = function (searchElement , fromIndex) {
+    var i,
+        pivot = (fromIndex) ? fromIndex : 0,
+        length;
+
+    if (!this) {
+      throw new TypeError();
+    }
+
+    length = this.length;
+
+    if (length === 0 || pivot >= length) {
+      return -1;
+    }
+
+    if (pivot < 0) {
+      pivot = length - Math.abs(pivot);
+    }
+
+    for (i = pivot; i < length; i++) {
+      if (this[i] === searchElement) {
+        return i;
+      }
+    }
+    return -1;
+  };
+}
+
+// Adds Function.prototype.bind to browsers that do not support it
+if (!Function.prototype.bind) {
+    Function.prototype.bind = function(context) {
+        var f = this,
+            args = Array.prototype.slice.call(arguments, 1);
+
+        return function() {
+            return f.apply(context, args.concat(Array.prototype.slice.call(arguments)));
+        };
+    };
+}
+
 /**
  * class Xooie.helpers
  *
@@ -76,9 +120,15 @@ define('xooie/helpers', ['jquery'], function($){
 *   limitations under the License.
 */
 
-define('xooie/stylesheet', ['jquery'], function($) {
+define('xooie/stylesheet', ['jquery', 'xooie/helpers'], function($, helpers) {
+    
+
+    function nameCheck (index, name) {
+        return document.styleSheets[index].ownerNode.getAttribute('id') === name;
+    }
+
     var Stylesheet = function(name){
-        var i, title;
+        var title;
 
         //check to see if a stylesheet already exists with this name
         this.element = $('style[id=' + name + ']');
@@ -92,17 +142,11 @@ define('xooie/stylesheet', ['jquery'], function($) {
             this.element.appendTo($('head'));
         }
 
-        if (document.styleSheets) {
-            for (i = 0; i < document.styleSheets.length; i += 1){
-                if (document.styleSheets[i].ownerNode.getAttribute('id') === name) {
-                    this._index = i;
-                }
-            }
-        }
+        this._name = name;
     };
 
     Stylesheet.prototype.get = function(){
-        return document.styleSheets[this._index];
+        return document.styleSheets[this.getIndex()];
     };
 
     Stylesheet.prototype.getRule = function(ruleName){
@@ -169,6 +213,25 @@ define('xooie/stylesheet', ['jquery'], function($) {
         }
 
         return false;
+    };
+
+    Stylesheet.prototype.getIndex = function() {
+        var i;
+
+        if (helpers.isUndefined(document.styleSheets)) {
+            return;
+        }
+
+        if (!helpers.isUndefined(this._index) && nameCheck(this._index, this._name)) {
+            return this._index;
+        } else {
+            for (i = 0; i < document.styleSheets.length; i += 1){
+                if (nameCheck(i, this._name)) {
+                    this._index = i;
+                    return i;
+                }
+            }
+        }
     };
 
     return Stylesheet;
@@ -626,12 +689,31 @@ define('xooie/shared', ['jquery'], function($){
       if (typeof instance[prop.setter] === 'function') {
         instance[prop.setter](value);
       }
+    },
+
+/**
+ * Xooie.shared.setData(instance, data)
+ * - instance (Widget | Addon): The instance to set data on
+ * - data (Object): A collection of key/value pairs
+ *
+ * Sets the properties to the values specified, as long as the property has been defined
+ **/
+    setData: function(instance, data) {
+      var i, prop;
+
+      for (i = 0; i < instance._definedProps.length; i++) {
+        prop = instance._definedProps[i];
+        if (typeof data[prop] !== 'undefined') {
+          instance.set(prop, data[prop]);
+        }
+      }
     }
 
   };
 
   return shared;
 });
+
 define('xooie/keyboard_navigation', ['jquery', 'xooie/helpers'], function($, helpers){
   var selectors, keyboardNavigation, keybindings;
 
@@ -973,7 +1055,7 @@ define('xooie/widgets/base', ['jquery', 'xooie/xooie', 'xooie/helpers', 'xooie/s
     element = $(element);
 
     //set the default options
-    this._setData(element.data());
+    shared.setData(this, element.data());
 
     //do instance tracking
     if (element.data('xooieInstance')) {
@@ -1318,22 +1400,6 @@ define('xooie/widgets/base', ['jquery', 'xooie/xooie', 'xooie/helpers', 'xooie/s
 
 //PROTOTYPE DEFINITIONS
 
-/** internal
- * Xooie.widget#_setData(data)
- * - data (Object): A collection of key/value pairs.
- *
- * Sets the properties to the values specified, as long as the property has been defined.
- **/
-  Widget.prototype._setData = function(data) {
-    var i;
-
-    for (i = 0; i < this._definedProps.length; i+=1) {
-      if (typeof data[this._definedProps[i]] !== 'undefined') {
-        this.set(this._definedProps[i], data[this._definedProps[i]]);
-      }
-    }
-  };
-
 /**
  * Xooie.Widget#get(name) -> object
  * - name (String): The name of the property to be retrieved.
@@ -1520,7 +1586,7 @@ define('xooie/event_handler', ['jquery', 'xooie/helpers'], function($, helpers) 
   };
 
   function format(type, namespace) {
-    if (typeof namespace === 'undefined') {
+    if (!namespace) {
       return type;
     } else {
       return type + '.' + namespace;
@@ -1576,6 +1642,7 @@ define('xooie/event_handler', ['jquery', 'xooie/helpers'], function($, helpers) 
 
   return EventHandler;
 });
+
 /*
 *   Copyright 2013 Comcast
 *
@@ -1710,8 +1777,12 @@ define('xooie/widgets/carousel', ['jquery', 'xooie/helpers', 'xooie/widgets/base
           return;
         }
 
-        if (direction === 'goto' && quantity < 1 && quantity <= items.length) {
+        if (direction === 'goto' && quantity > 1 && quantity <= items.length) {
           pos = Math.round(items.eq(quantity - 1).position().left);
+
+          if (pos === 0) {
+            return;
+          }
         } else {
           i = this.currentItem(direction === 'right');
 
@@ -2655,6 +2726,18 @@ define('xooie/widgets/dropdown', ['jquery', 'xooie/widgets/base'], function($, B
  * visually.  Content is hidden until the associated tab is activated.
  **/
 define('xooie/widgets/tab', ['jquery', 'xooie/helpers', 'xooie/widgets/base', 'xooie/event_handler'], function($, helpers, Base, EventHandler) {
+
+  function setSelection(widget, selectedTabs) {
+    var activeTabs = widget.getActiveTabs();
+
+    activeTabs.not(selectedTabs).each(function() {
+      widget.deactivateTab($(this));
+    });
+
+    selectedTabs.not(activeTabs).each(function() {
+      widget.activateTab($(this));
+    });
+  }
 /**
  * Xooie.Tab@xooie-tab-active(event)
  * - event (Event): A jQuery event object
@@ -2689,25 +2772,19 @@ define('xooie/widgets/tab', ['jquery', 'xooie/helpers', 'xooie/widgets/base', 'x
 
     this._tabEvents.add({
       keyup: function(event){
-        var activeTab = self.getActiveTabs();
-
-        if ([13,32].indexOf(event.which) !== -1 && !activeTab.is(this)){
-          self.deactivateTab(activeTab);
-
-          self.activateTab($(this));
+        if ([13,32].indexOf(event.which) !== -1){
+          setSelection(self, self.selectTabs(event, $(this)));
 
           event.preventDefault();
         }
       },
 
-      mouseup: function(){
-        var activeTab = self.getActiveTabs();
+      mouseup: function(event){
+        setSelection(self, self.selectTabs(event, $(this)));
+      },
 
-        if (!activeTab.is(this)) {
-          self.deactivateTab(activeTab);
-
-          self.activateTab($(this));
-        }
+      click: function(event){
+        event.preventDefault();
       }
     });
 
@@ -2832,6 +2909,23 @@ define('xooie/widgets/tab', ['jquery', 'xooie/helpers', 'xooie/widgets/base', 'x
     e.tabId = tab.attr('id');
 
     this.root().trigger(e);
+  };
+
+/**
+ * Xooie.Tab#selectTabs(event, selectedTab)
+ * - event (Event): Browser event that triggered selectTabs call
+ * - selectedTab (Element): Tab that was selected by a mouse or keyboard event
+ *
+ * Only called by mouse/keyboard event handlers to generate the list of
+ * currently active tabs. Should return a jQuery collection of tabs that are
+ * to be active. Any tabs which are currently active and not in the
+ * collection will be deactivated, and likewise any tabs not currently active
+ * and in the collection will be activated.
+ *
+ * Override this method to alter the behavior of the Tab widget.
+ **/
+  Tab.prototype.selectTabs = function(event, selectedTab) {
+    return selectedTab;
   };
 
 /**
@@ -2960,38 +3054,9 @@ define('xooie/widgets/tab', ['jquery', 'xooie/helpers', 'xooie/widgets/base', 'x
 
   return Tab;
 });
+
 define('xooie/widgets/accordion', ['jquery', 'xooie/widgets/tab'], function($, Tab){
   var Accordion = Tab.extend(function() {
-    var self = this;
-
-    this._tabEvents.clear('keyup');
-    this._tabEvents.clear('mouseup');
-
-    this._tabEvents.add({
-      keyup: function(event){
-        var activeTab = self.getActiveTabs();
-
-        if ([13,32].indexOf(event.which) !== -1){
-          if (activeTab.is(this)) {
-            self.deactivateTab($(this));
-          } else {
-            self.activateTab($(this));
-          }
-
-          event.preventDefault();
-        }
-      },
-
-      mouseup: function(){
-        var activeTab = self.getActiveTabs();
-
-        if (activeTab.is(this)) {
-          self.deactivateTab($(this));
-        } else {
-          self.activateTab($(this));
-        }
-      }
-    });
   });
 
   Accordion.define('namespace', 'accordion');
@@ -3010,8 +3075,19 @@ define('xooie/widgets/accordion', ['jquery', 'xooie/widgets/tab'], function($, T
     return tablist;
   };
 
+  Accordion.prototype.selectTabs = function(event, selectedTab) {
+    var activeTabs = this.getActiveTabs();
+
+    if (activeTabs.is(selectedTab)) {
+      return activeTabs.not(selectedTab);
+    } else {
+      return activeTabs.add(selectedTab);
+    }
+  };
+
   return Accordion;
 });
+
 /*
 *   Copyright 2013 Comcast
 *
@@ -3145,802 +3221,3 @@ define('xooie/dialog', ['jquery', 'xooie/base'], function($, Base) {
     return Dialog;
 });
 define("xooie/widgets/dialog", function(){});
-
-/*
-*   Copyright 2013 Comcast
-*
-*   Licensed under the Apache License, Version 2.0 (the "License");
-*   you may not use this file except in compliance with the License.
-*   You may obtain a copy of the License at
-*
-*       http://www.apache.org/licenses/LICENSE-2.0
-*
-*   Unless required by applicable law or agreed to in writing, software
-*   distributed under the License is distributed on an "AS IS" BASIS,
-*   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-*   See the License for the specific language governing permissions and
-*   limitations under the License.
-*/
-
-/**
- * class Xooie.Addon
- *
- * The base xooie addon module.  This module defines how addons function in relation to
- * widgets, but contains no specific functionality.
- **/
-define('xooie/addons/base', ['jquery', 'xooie/shared'], function($, shared) {
-/**
- * Xooie.Addon@xooie-addon-init(event)
- * - event (Event): A jQuery event object
- *
- * A jQuery special event triggered when the addon is successfully initialized.  Triggers on the `root` element
- * of the adodn's widget.  Unlike [[Xooie.Widget@xooie-init]], this event only triggers when the addon is first instantiated.
- **/
-
-/**
- * new Xooie.Addon(widget)
- * - widget (Widget): An instance of [[Xooie.Widget]].
- *
- * Instantiating a new Addon associates the addon with the widget passed into the constructor.  The addon is
- * stored in the [[Xooie.Widget#addons]] collection.
- **/
-    var Addon = function(widget) {
-        var self = this;
-
-        // Check to see if the module is defined:
-        if (typeof widget === 'undefined') {
-            return false;
-        }
-
-        // If there is already an instance of this addon instantiated for the module, return it:
-        if (widget.addons() && widget.addons().hasOwnProperty(this.name())) {
-            return widget.addons()[this.name()];
-        }
-
-        // Add this addon to the widget's addons collection:
-        widget.addons()[this.name()] = this;
-
-        widget.root().addClass(this.addonClass());
-
-        // Reference the widget:
-        this.widget(widget);
-
-        // Check to see if there are any additional constructors to call;
-        var initCheck = function(){
-            var i;
-
-            if (!self._extendCount || self._extendCount <= 0) {
-                self.widget().root().trigger(self.get('initEvent'));
-                self._extendCount = null;
-            } else {
-                setTimeout(initCheck, 0);
-            }
-        };
-
-        if (this._extendCount > 0) {
-            setTimeout(initCheck, 0);
-        } else {
-            initCheck();
-        }
-    };
-
-/**
- * Xooie.Addon.defineReadOnly(name, defaultValue)
- * - name (String): The name of the property to define as a read-only property.
- * - defaultValue (Object): An optional default value.
- *
- * See [[Xooie.shared.defineReadOnly]].
- **/
-    Addon.defineReadOnly = function(name, defaultValue){
-        shared.defineReadOnly(this, name, defaultValue);
-    };
-
-/**
- * Xooie.Addon.defineWriteOnly(name)
- * - name (String): The name of the property to define as a write-only property
- *
- * See [[Xooie.shared.defineWriteOnly]].
- **/
-    Addon.defineWriteOnly = function(name){
-        shared.defineWriteOnly(this, name);
-    };
-
-/**
- * Xooie.Widget.define(name[, defaultValue])
- * - name (String): The name of the property to define.
- * - defaultValue: An optional default value.
- *
- * A method that defines a property as both readable and writable.  In reality it calls both [[Xooie.Addon.defineReadOnly]]
- * and [[Xooie.Addon.defineWriteOnly]].
- **/
-    Addon.define = function(name, defaultValue){
-        this.defineReadOnly(name, defaultValue);
-        this.defineWriteOnly(name);
-    };
-
-/**
- * Xooie.Addon.extend(constr) -> Addon
- * - constr (Function): The constructor for the new [[Xooie.Addon]] class.
- *
- * See [[Xooie.shared.extend]].
- **/
-    Addon.extend = function(constr){
-        return shared.extend(constr, this);
-    };
-
-/** internal
- * Xooie.Addon#_definedProps -> Array
- *
- * Same as [[Xooie.Widget#_definedProps]].
- **/
-    Addon.prototype._definedProps = [];
-
-/** internal
- * Xooie.Addon#_extendCount -> Integer | null
- *
- * Same as [[Xooie.Widget#_extendCount]].
- **/
-    Addon.prototype._extendCount = null;
-
-/** internal
- * Xooie.Addon#_widget -> Widget
- *
- * The widget for which this addon was instantiated.
- **/
-/**
- * Xooie.Addon#widget([value]) -> Widget
- * - value: an optional value to be set.
- *
- * The method for setting or getting [[Xooie.Addon#_widget]].  Returns the current value of
- * [[Xooie.Addon#_widget]] if no value is passed or sets the value.
- **/
-    Addon.define('widget');
-
-/** internal
- * Xooie.Addon#_name -> String
- *
- * The name of the addon.
- **/
-/**
- * Xooie.Addon#name([value]) -> String
- * - value: an optional value to be set.
- *
- * The method for setting or getting [[Xooie.Addon#_name]].  Returns the current value of
- * [[Xooie.Addon#_name]] if no value is passed or sets the value.
- **/
-    Addon.define('name', 'addon');
-
-/** internal, read-only
- * Xooie.Addon#_initEvent -> String
- *
- * The name of the event triggered when the addon is instantiated.
- **/
-/** read-only
- * Xooie.Addon#initEvent() -> String
- *
- * The method for getting [[Xooie.Addon#_initEvent]].
- **/
-    Addon.defineReadOnly('initEvent', 'xooie-addon-init');
-
-/** internal, read-only
- * Xooie.Addon#_addonClass -> String
- *
- * The class added to the widget root indicating that this addon has been instantiated.
- **/
-/** read-only
- * Xooie.Addon#addonClass() -> String
- *
- * The method for getting [[Xooie.Addon#_addonClass]].
- **/
-    Addon.defineReadOnly('addonClass', 'has-addon');
-
-/**
- * Xooie.Addon#get(name) -> object
- * - name (String): The name of the property to be retrieved.
- *
- * See [[Xooie.shared.get]].
- **/
-    Addon.prototype.get = function(name) {
-        return shared.get(this, name);
-    };
-
-/**
- * Xooie.Addon#set(name, value)
- * - name (String): The name of the property to be set.
- * - value: The value of the property to be set.
- *
- * See [[Xooie.shared.set]].
- **/
-    Addon.prototype.set = function(name, value) {
-        return shared.set(this, name, value);
-    };
-
-/**
- * Xooie.Addon#cleanup()
- *
- * Removes the `addonClass` from the `root` of the associated `widget` and prepares this widget to be
- * garbage collected.
- **/
-    Addon.prototype.cleanup = function() {
-        this.widget().root().removeClass(this.addonClass());
-    };
-
-/** internal
- * Xooie.Addon#_process_initEvent(initEvent) -> String
- * - initEvent (String): The unmodified initEvent string.
- *
- * Adds the [[Xooie.Addon#name]] to the `initEvent`
- **/
-    Addon.prototype._process_initEvent = function(initEvent) {
-        return this.name() === 'addon' ? initEvent : initEvent + '.' + this.name();
-    };
-
-/** internal
- * Xooie.Addon#_process_addonClass(className) -> String
- * - className (String): The unmodified className string.
- *
- * Adds the [[Xooie.Addon#name]] to the `addonClass`
- **/
-    Addon.prototype._process_addonClass = function(addonClass) {
-        return this.name() === 'addon' ? addonClass : 'has-' + this.name() + '-addon';
-    };
-
-    return Addon;
-});
-
-/*
-*   Copyright 2013 Comcast
-*
-*   Licensed under the Apache License, Version 2.0 (the "License");
-*   you may not use this file except in compliance with the License.
-*   You may obtain a copy of the License at
-*
-*       http://www.apache.org/licenses/LICENSE-2.0
-*
-*   Unless required by applicable law or agreed to in writing, software
-*   distributed under the License is distributed on an "AS IS" BASIS,
-*   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-*   See the License for the specific language governing permissions and
-*   limitations under the License.
-*/
-
-define('xooie/addons/carousel_lentils', ['jquery', 'xooie/addons/base'], function($, Base) {
-
-    var Lentils = Base('lentils', function(){
-        var self = this;
-
-        this.lentilBuilders = {
-            "item": function(container, template){
-                var items = self.module.content.children(),
-                    element, i;
-
-                for (i = 0; i < items.length; i += 1) {
-
-                    element = self.module.render(template, {
-                        number: i + 1,
-                        scroll_mode: "item",
-                        lentil_is_last: (i === items.length - 1)
-                    });
-                    container.append(element);
-                }
-            },
-
-            "page": function(container, template){
-                if (typeof self.module.addons.pagination === 'undefined') {
-                    return;
-                }
-
-                var element, i;
-
-                for (i = 0; i < self.module.addons.pagination._breaks.length; i += 1) {
-                    element = self.module.render(template, {
-                        number: i + 1,
-                        scroll_mode: "page",
-                        lentil_is_last: (i === self.module.addons.pagination._breaks.length - 1)
-                    });
-
-                    container.append(element);
-                }
-
-            }
-
-        };
-
-        this.module.root.addClass('is-carousel-lentiled');
-
-        this.module.root.on('carouselUpdated', function(){
-            self.updateLentils();
-        });
-
-        this.module.root.on('carouselScrollComplete', function(){
-            self.currentLentil();
-        });
-
-        this.updateLentils();
-
-        this.currentLentil();
-
-    });
-
-    Lentils.setDefaultOptions({
-        lentilMode: 'item',
-        lentilSelector: '[data-role="carousel-lentils"]',
-        lentilTemplateSelector: '[data-role="carousel-lentils-template"]',
-
-        activeLentilClass: 'is-active-lentil'
-    });
-
-    Lentils.prototype.currentLentil = function(){
-        var container = this.module.root.find(this.options.lentilSelector),
-            lentils = container.children(),
-            index;
-
-        if (this.options.lentilMode === 'page' && typeof this.module.addons.pagination !== 'undefined') {
-            index = this.module.addons.pagination.currentPage();
-        } else {
-            index = this.module.currentItem();
-        }
-
-        lentils.filter('.' + this.options.activeLentilClass).removeClass(this.options.activeLentilClass);
-
-        lentils.eq(index).addClass(this.options.activeLentilClass);
-    };
-
-    Lentils.prototype.updateLentils = function() {
-        var container = this.module.root.find(this.options.lentilSelector),
-            template = this.module.root.find(this.options.lentilTemplateSelector),
-            self = this;
-
-        if (container.length > 0 && template.length > 0) {
-            container.html('');
-
-            if (typeof this.lentilBuilders[this.options.lentilMode] === 'function') {
-                this.lentilBuilders[this.options.lentilMode](container, template);
-
-                container.children().on('click', function(event) {
-                    event.preventDefault();
-                    self.module.updatePosition($(this).data('scroll'));
-                });
-
-                this.currentLentil();
-
-            }
-        }
-    };
-
-    return Lentils;
-});
-
-/*
-*   Copyright 2013 Comcast
-*
-*   Licensed under the Apache License, Version 2.0 (the "License");
-*   you may not use this file except in compliance with the License.
-*   You may obtain a copy of the License at
-*
-*       http://www.apache.org/licenses/LICENSE-2.0
-*
-*   Unless required by applicable law or agreed to in writing, software
-*   distributed under the License is distributed on an "AS IS" BASIS,
-*   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-*   See the License for the specific language governing permissions and
-*   limitations under the License.
-*/
-
-define('xooie/addons/carousel_pagination', ['jquery', 'xooie/addons/base'], function($, Base){
-
-    var Pagination = Base('pagination', function() {
-        var self = this;
-
-        this._breaks = [];
-
-        this.module.positionUpdaters = $.extend({}, this.module.positionUpdaters, {
-            "page": function(quantity, direction) {
-                var items = self.module.content.children(),
-                    bias = 1,
-                    offset = 0,
-                    position = self.module.wrapper.scrollLeft(),
-                    i;
-
-                if (typeof direction === 'undefined') {
-                    if (quantity > 0 && quantity <= self._breaks.length) {
-                        offset = Math.round(items.eq(self._breaks[quantity - 1]).position().left);
-                    }
-                } else {
-                    direction = direction === -1 ? -1 : 1;
-
-                    bias = -direction;
-
-                    if (!quantity || typeof quantity !== 'number') {
-                        quantity = 1;
-                    }
-
-                    i = self.currentPage(bias) + direction * quantity;
-                    i = Math.max(0, Math.min(self._breaks.length - 1, i));
-                    offset = Math.round(items.eq(self._breaks[i]).position().left);
-                }
-
-                return position + offset;
-            }
-        });
-
-        this.module.snapMethods = $.extend({}, this.module.snapMethods, {
-            "page": function() {
-                var items = self.module.content.children(),
-                    offset, p1, p2,
-                    i = self.currentPage();
-
-                p1 = items.eq(self._breaks[i]).position().left;
-                if (Math.abs(p1) < 1) {
-                    p1 = p1 < 0 ? Math.ceil(p1) : Math.floor(p1);
-                } else {
-                    p1 = Math.round(p1);
-                }
-
-                if (p1 !== 0 && i > 0) {
-                    p2 = items.eq(self._breaks[i - 1]).position().left;
-
-                    if (Math.abs(p2) < 1) {
-                        p2 = p2 < 0 ? Math.ceil(p2) : Math.floor(p2);
-                    } else {
-                        p2 = Math.round(p2);
-                    }
-
-                    if (Math.abs(p1) < Math.abs(p2)) {
-                        offset = p1 + self.module.wrapper.scrollLeft();
-                    } else {
-                        offset = p2 + self.module.wrapper.scrollLeft();
-                    }
-
-                    self.module.wrapper.animate({ scrollLeft: offset });
-                }
-            }
-        });
-
-        this.module.displayMethods = $.extend({}, this.module.displayMethods, {
-            "page": function(container, template){
-
-                var element = self.module.render(template, {
-                    current_page: self.currentPage() + 1,
-                    total_pages: self._breaks.length
-                });
-
-                container.append(element);
-            }
-        });
-
-        this.module.root.on('carouselUpdated', function(){
-            self.updateBreaks();
-        });
-
-        this.updateBreaks();
-    });
-
-    Pagination.prototype.currentPage = function(bias) {
-        var i, k, items = this.module.content.children(),
-            position, itemWidth, lastItem;
-
-        if (typeof bias === 'undefined') {
-            bias = 1;
-        }
-
-        if (bias === 1) {
-            position = this.module.content.position().left;
-
-            for (i = 0; i < this._breaks.length; i += 1) {
-                itemWidth = 0;
-                lastItem = (i === this._breaks.length - 1) ? items.length : this._breaks[i + 1];
-
-                for (k = this._breaks[i]; k < lastItem; k += 1) {
-                    itemWidth += items.eq(k).outerWidth(true);
-                }
-
-                if (position + (this.module.options.visibleThreshold * itemWidth) >= 0){
-                    return i;
-                } else {
-                    position += itemWidth;
-                }
-            }
-            return items.length - 1;
-        } else {
-            position = this.module.content.outerWidth(true) + this.module.content.position().left;
-
-            for (i = this._breaks.length - 1; i >= 0; i--) {
-                itemWidth = 0;
-                lastItem = (i === this._breaks.length - 1) ? items.length : this._breaks[i + 1]; 
-
-                for (k = this._breaks[i]; k < lastItem; k += 1) {
-                    itemWidth += items.eq(k).outerWidth(true);
-                }
-                position -= itemWidth;
-
-                if (position <= this.module.options.visibleThreshold * itemWidth) {
-                    return i;
-                }
-            }
-            return 0;
-        }
-    };
-
-    Pagination.prototype.updateBreaks = function() {
-        var items = this.module.content.children(),
-            width = 0,
-            breakPoint = this.module.wrapper.innerWidth(),
-            breaks = [0];
-
-        items.each(function(i) {
-            var node = $(this),
-                w = node.outerWidth(true);
-
-            width += w;
-
-            if (width > breakPoint) {
-                if (width - (w - node.innerWidth()) > breakPoint) {
-                    width = w;
-                    breaks.push(i);
-                }
-            }
-        });
-
-        this.module.root.toggleClass('is-carousel-paginated', breaks.length > 1);
-
-        this._breaks = breaks;
-
-        this.module.updateDisplay();
-    };
-
-    return Pagination;
-});
-
-/*
-*   Copyright 2013 Comcast
-*
-*   Licensed under the Apache License, Version 2.0 (the "License");
-*   you may not use this file except in compliance with the License.
-*   You may obtain a copy of the License at
-*
-*       http://www.apache.org/licenses/LICENSE-2.0
-*
-*   Unless required by applicable law or agreed to in writing, software
-*   distributed under the License is distributed on an "AS IS" BASIS,
-*   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-*   See the License for the specific language governing permissions and
-*   limitations under the License.
-*/
-
-define('xooie/addons/tab_animation', ['jquery', 'xooie/addons/base'], function($, Base) {
-
-    var Animation = Base('animation', function(){
-        var self = this,
-            isAnimating = false,
-            animationQueue = [],
-            callback = function(){
-                if (animationQueue.length > 0) {
-                    animationQueue.shift()();
-                } else {
-                    isAnimating = false;
-                }
-            };
-
-        this.module.root.on('tabChange', function(event){
-            animationQueue.push(function(){
-                var direction;
-
-                if (self.options.wrap) {
-                    if (event.toTab === 0 && event.fromTab === self.module.getPanel().length - 1) {
-                        direction = 1;
-                    } else if (event.toTab === self.module.getPanel().length - 1 && event.fromTab === 0) {
-                        direction = -1;
-                    } else {
-                        direction = event.toTab > event.fromTab ? 1 : -1;
-                    }
-                } else {
-                    direction = event.toTab > event.fromTab ? 1 : -1;
-                }
-
-                self.animateToTab(event.toTab, event.fromTab , direction, callback);
-            });
-
-            if (!isAnimating) {
-                isAnimating = true;
-                callback();
-            }
-        });
-
-        var getAnimation = function(el, properties) {
-            return function(cb) {
-                el.animate(properties, {
-                    duration: self.options.duration,
-                    easing: self.options.easing,
-                    complete: function() {
-                        $(this).attr('style', '');
-                        cb();
-                    }
-                });
-            };
-        };
-
-        this.animationMethods = {
-
-            "horizontal": function(to, from, container, direction){
-                var calls = [];
-
-                container.css({
-                    overflow: 'hidden',
-                    height: from.outerHeight(),
-                    width: container.width()
-                });
-
-                from.css({
-                    display: 'block',
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: from.width(),
-                    height: from.height()
-                });
-
-                to.css({
-                    display: 'block',
-                    position: 'absolute',
-                    top: 0,
-                    left: (direction === -1) ? -container.innerWidth() : container.innerWidth(),
-                    width: to.width(),
-                    height: to.height()
-                });
-
-                calls.push(
-                    getAnimation(from, {
-                        left: (direction === -1) ? container.innerWidth() : -container.innerWidth()
-                    }),
-
-                    getAnimation(to, {
-                        left: 0
-                    }),
-
-                    getAnimation(container, {
-                        height: to.outerHeight()
-                    })
-                );
-
-                return calls;
-            },
-
-            "vertical": function(to, from, container, direction){
-                var calls = [];
-
-                container.css({
-                    overflow: 'hidden',
-                    height: from.outerHeight(),
-                    width: container.width()
-                });
-
-                from.css({
-                    display: 'block',
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: from.width(),
-                    height: from.height()
-                });
-
-                to.css({
-                    display: 'block',
-                    position: 'absolute',
-                    top: (direction === -1) ? -container.innerHeight() : container.innerHeight(),
-                    left: 0,
-                    width: to.width(),
-                    height: to.height()
-                });
-
-                calls.push(
-                    getAnimation(from, {
-                        top: (direction === -1) ? container.innerHeight() : -container.innerHeight()
-                    }),
-
-                    getAnimation(to, {
-                        top: 0
-                    }),
-
-                    getAnimation(container, {
-                        height: to.outerHeight()
-                    })
-                );
-
-                return calls;
-
-            },
-
-            "fade": function(to, from, container, direction) {
-                var calls = [];
-
-                container.css({
-                    overflow: 'hidden',
-                    height: from.outerHeight(),
-                    width: container.width()
-                });
-
-                from.css({
-                    display: 'block',
-                    position: 'absolute',
-                    opacity: 1.0,
-                    top: 0,
-                    left: 0,
-                    width: from.width(),
-                    height: from.height()
-                });
-
-                to.css({
-                    display: 'block',
-                    position: 'absolute',
-                    opacity: 0,
-                    top: 0,
-                    left: 0,
-                    width: to.width(),
-                    height: to.height()
-                });
-
-                calls.push(
-                    getAnimation(from, {
-                        opacity: 0
-                    }),
-
-                    getAnimation(to, {
-                        opacity: 1.0
-                    }),
-
-                    getAnimation(container, {
-                        height: to.outerHeight()
-                    })
-                );
-
-                return calls;
-
-            }
-        };
-    });
-
-    Animation.setDefaultOptions({
-        panelContainerSelector: '[data-role="panel-container"]',
-        animationMode: 'horizontal', //Can be horizontal, vertical or fade
-        easing: 'linear', //TODO: load other easings if necessary
-        duration: 500,
-        wrap: false
-    });
-
-    $.extend(Animation.prototype, {
-        animateToTab: function(index, currentIndex, direction, callback) {
-            if (index === currentIndex || index < 0 || index >= this.module.getPanel().length) {
-                return;
-            }
-
-            var from = this.module.getPanel(currentIndex),
-                to = this.module.getPanel(index),
-                container = from.parents(this.options.panelContainerSelector),
-                count = 1,
-                calls, i,
-                step_callback = function() {
-                    count--;
-
-                    if (count === 0 && callback) {
-                        callback();
-                    }
-                };
-
-            if (typeof this.animationMethods[this.options.animationMode] === 'function') {
-                calls = this.animationMethods[this.options.animationMode](to, from, container, direction);
-
-                for (i = 0; i < calls.length; i++) {
-                    count++;
-                    calls[i](step_callback);
-                }
-
-                step_callback();
-            }
-        }
-    });
-
-    return Animation;
-
-});
-

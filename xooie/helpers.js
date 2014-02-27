@@ -1,5 +1,5 @@
 /*
-*   Copyright 2012 Comcast
+*   Copyright 2013 Comcast
 *
 *   Licensed under the Apache License, Version 2.0 (the "License");
 *   you may not use this file except in compliance with the License.
@@ -20,45 +20,56 @@
  * A collection of helper methods used by Xooie modules.
  **/
 
-define('xooie/helpers', ['jquery'], function($){
-  var helpers = {};
+define('xooie/helpers', ['jquery'], function ($) {
+  'use strict';
+
+  var helpers = {
 /**
- * Xooie.helpers.toAry(str) -> Array
+ * Xooie.helpers.toArray(str) -> Array
  * - str (String | Array): The string to be converted to an array, or an array.
  *
  * Converts a string to an array, or returns the passed argument if it is already an array.  Used
  * when parsing data attributes that can be either a space-delineated string or an array.
  **/
-  helpers.toAry = function(str) {
-    if (typeof str === 'string') {
-      return str.split(/\s+/);
-    } else if (str instanceof Array) {
-      return str;
+    toArray: function (str) {
+      if (typeof str === 'string') {
+        return str.split(/\s+/);
+      }
+
+      if (str instanceof Array) {
+        return str;
+      }
+    },
+
+    isString: function (str) {
+      return typeof str === 'string';
+    },
+
+    toInteger: function (integer) {
+      return parseInt(integer, 10);
+    },
+
+    isArray: (function () {
+      return Array.isArray || function (ary) {
+        return Array.prototype.toString(ary) === '[object Array]';
+      };
+    }()),
+
+    isObject: function (obj) {
+      return $.isPlainObject(obj);
+    },
+
+    isUndefined: function (obj) {
+      return obj === undefined;
+    },
+
+    isDefined: function (obj) {
+      return !this.isUndefined(obj);
+    },
+
+    isFunction: function (func) {
+      return typeof func === 'function';
     }
-  };
-
-  helpers.toInt = function(int) {
-    return parseInt(int, 10);
-  };
-
-  helpers.isString = function(str) {
-    return typeof str === 'string';
-  };
-
-  helpers.isArray = Array.isArray || function(ary) {
-    return Array.prototype.toString(ary) === '[object Array]';
-  };
-
-  helpers.isObject = function(obj) {
-    return Object.prototype.toString(obj) === '[object Object]';
-  };
-
-  helpers.isUndefined = function(obj) {
-    return obj === void 0;
-  };
-
-  helpers.isFunction = function(func) {
-    return typeof func === 'function';
   };
 
   return helpers;
